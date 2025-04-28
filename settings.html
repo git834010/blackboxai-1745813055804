@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Fighting Arena | Settings</title>
+    <link href="/dist/output.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="/favicon.ico">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background-color: #0f172a;
+        }
+        .setting-card {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+        }
+        .btn-glow {
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.7);
+            transition: all 0.3s ease;
+        }
+        .btn-glow:hover {
+            box-shadow: 0 0 25px rgba(59, 130, 246, 1);
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 8px;
+            background: #334155;
+            border-radius: 4px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #3b82f6;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="text-white min-h-screen flex items-center justify-center p-4">
+    <div class="setting-card max-w-2xl w-full rounded-xl overflow-hidden shadow-2xl">
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 p-6">
+            <h1 class="text-3xl font-bold"><i class="fas fa-cog mr-3"></i> Game Settings</h1>
+        </div>
+        
+        <div class="p-6 space-y-8">
+            <!-- Controls Section -->
+            <div>
+                <h2 class="text-xl font-semibold mb-4 border-b border-gray-700 pb-2">Controls</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Player 1 Controls -->
+                    <div>
+                        <h3 class="text-lg text-red-400 mb-3">Player 1</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm mb-1">Move Forward</label>
+                                <select class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2">
+                                    <option>W</option>
+                                    <option>ArrowUp</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm mb-1">Move Backward</label>
+                                <select class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2">
+                                    <option>S</option>
+                                    <option>ArrowDown</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm mb-1">Punch</label>
+                                <select class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2">
+                                    <option>Q</option>
+                                    <option>J</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Player 2 Controls -->
+                    <div>
+                        <h3 class="text-lg text-blue-400 mb-3">Player 2</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm mb-1">Move Forward</label>
+                                <select class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2">
+                                    <option>ArrowUp</option>
+                                    <option>I</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm mb-1">Move Backward</label>
+                                <select class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2">
+                                    <option>ArrowDown</option>
+                                    <option>K</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm mb-1">Punch</label>
+                                <select class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2">
+                                    <option>E</option>
+                                    <option>L</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Graphics Section -->
+            <div>
+                <h2 class="text-xl font-semibold mb-4 border-b border-gray-700 pb-2">Graphics</h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm mb-2">Quality Preset</label>
+                        <div class="flex gap-4">
+                            <button class="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded flex-1">Low</button>
+                            <button class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded flex-1">Medium</button>
+                            <button class="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded flex-1">High</button>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm mb-2">Resolution Scale: <span id="resolutionValue">100</span>%</label>
+                        <input type="range" min="50" max="100" value="100" class="w-full" id="resolutionScale">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Audio Section -->
+            <div>
+                <h2 class="text-xl font-semibold mb-4 border-b border-gray-700 pb-2">Audio</h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm mb-2">Master Volume: <span id="masterVolumeValue">80</span>%</label>
+                        <input type="range" min="0" max="100" value="80" class="w-full" id="masterVolume">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm mb-2">Music Volume: <span id="musicVolumeValue">70</span>%</label>
+                        <input type="range" min="0" max="100" value="70" class="w-full" id="musicVolume">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row gap-4 pt-4">
+                <button class="btn-glow bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg flex-1">
+                    <i class="fas fa-save mr-2"></i> Save Settings
+                </button>
+                <a href="index.html" class="btn-glow bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg flex-1 text-center">
+                    <i class="fas fa-home mr-2"></i> Back to Menu
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/scripts/settings.js"></script>
+</body>
+</html>
