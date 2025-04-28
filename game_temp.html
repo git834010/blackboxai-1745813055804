@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Fighting Arena | Battle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.min.js"></script>
+    <script>
+        // Make THREE globally available
+        window.THREE = THREE;
+    </script>
+    <style>
+        body { margin: 0; overflow: hidden }
+        canvas { display: block; width: 100%; height: 100% }
+        #uiContainer { 
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            pointer-events: none;
+        }
+        .health-bar { 
+            height: 30px; 
+            transition: width 0.3s ease;
+            margin: 10px;
+        }
+        #player1Health { background: linear-gradient(to right, #ef4444, #b91c1c) }
+        #player2Health { background: linear-gradient(to right, #3b82f6, #1d4ed8) }
+        #roundTimer {
+            background: rgba(0,0,0,0.5);
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="uiContainer">
+        <!-- Player 1 Health -->
+        <div style="position: absolute; top: 20px; left: 20px; width: 200px;">
+            <div id="player1Health" class="health-bar" style="width: 100%"></div>
+        </div>
+        
+        <!-- Player 2 Health -->
+        <div style="position: absolute; top: 20px; right: 20px; width: 200px;">
+            <div id="player2Health" class="health-bar" style="width: 100%"></div>
+        </div>
+        
+        <!-- Round Timer -->
+        <div style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%);">
+            <div id="roundTimer" style="color: white; font-family: Arial; font-size: 24px;">60</div>
+        </div>
+    </div>
+
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, canvas: document.getElementById('gameCanvas') });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(1, 1, 1);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
+
+        // Create arena
+        const arenaSize = 20;
+        const arenaGeometry = new THREE.BoxGeometry(arenaSize, 0.5, arenaSize);
+        const arenaMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x333333,
+            roughness: 0.8,
+            metalness: 0.2
+        });
+        const arena = new THREE.Mesh(arenaGeometry, arenaMaterial);
+        arena.receiveShadow = true;
+        arena.position.y = -0.5;
+        scene.add(arena);
+
+        // Create simple character placeholders (cubes)
+        const createFighter = (color, xPos) => {
+            const geometry = new THREE.BoxGeometry(1, 2, 1);
+            const material = new THREE.MeshStandardMaterial({ color });
+            const fighter = new THREE.Mesh(geometry, material);
+            fighter.castShadow = true;
+            fighter.position.set(xPos, 1, 0);
+            return fighter;
+        };
+
+        const player1 = createFighter(0xff0000, -5);
+        const player2 = createFighter(0x0000ff, 5);
+        scene.add(player1, player2);
+
+        // Position camera
+        camera.position.set(0, 10, 15);
+        camera.lookAt(0, 0, 0);
+
+        // Game state
+        const gameState = {
+            player1: { health: 100, controls: { left: 'a', right: 'd', up: 'w', down: 's', punch: 'q' } },
+            player2: { health: 100, controls: { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown', punch: 'e' } },
+            roundTime: 60,
+            keys: {}
+        };
+
+        // Input handling
+        document.addEventListener('keydown', (e) => gameState.keys[e.key] = true);
+        document.addEventListener('keyup', (e) => gameState.keys[e.key] = false);
+
+        // Game loop
+        const animate = () => {
+            requestAnimationFrame(animate);
+            
+            // Movement
+            if (gameState.keys[gameState.player1.controls.left]) player1.position.x -= 0.1;
+            if (gameState.keys[gameState.player1.controls.right]) player1.position.x += 0.1;
+            if (gameState.keys[gameState.player1.controls.up]) player1.position.z -= 0.1;
+            if (gameState.keys[gameState.player1.controls.down]) player1.position.z += 0.1;
+            
+            if (gameState.keys[gameState.player2.controls.left]) player2.position.x -= 0.1;
+            if (gameState.keys[gameState.player2.controls.right]) player2.position.x += 0.1;
+            if (gameState.keys[gameState.player2.controls.up]) player2.position.z -= 0.1;
+            if (gameState.keys[gameState.player2.controls.down]) player2.position.z += 0.1;
+
+            // Boundary checks
+            const boundary = arenaSize/2 - 1;
+            player1.position.x = Math.max(-boundary, Math.min(boundary, player1.position.x));
+            player1.position.z = Math.max(-boundary, Math.min(boundary, player1.position.z));
+            player2.position.x = Math.max(-boundary, Math.min(boundary, player2.position.x));
+            player2.position.z = Math.max(-boundary, Math.min(boundary, player2.position.z));
+
+            renderer.render(scene, camera);
+        };
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
