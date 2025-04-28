@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>3D Fighting Arena | Battle</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.min.js"></script>
+    <script>
+        window.THREE = THREE;
+    </script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            touch-action: none;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            outline: none;
+        }
+        #uiContainer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            pointer-events: none;
+            font-family: Arial, sans-serif;
+        }
+        .health-bar {
+            height: 20px;
+            transition: width 0.2s ease-out;
+            margin: 8px;
+            border-radius: 4px;
+        }
+        #player1Health {
+            background: linear-gradient(to right, #ef4444, #b91c1c);
+        }
+        #player2Health {
+            background: linear-gradient(to right, #3b82f6, #1d4ed8);
+        }
+        #roundTimer {
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" tabindex="0"></canvas>
+
+    <div id="uiContainer">
+        <div style="position: absolute; top: 10px; left: 10px; width: 200px;">
+            <div id="player1Health" class="health-bar" style="width: 100%"></div>
+        </div>
+        <div style="position: absolute; top: 10px; right: 10px; width: 200px;">
+            <div id="player2Health" class="health-bar" style="width: 100%"></div>
+        </div>
+        <div style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%);">
+            <div id="roundTimer">60</div>
+        </div>
+    </div>
+
+    <script>
+        try {
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x111111);
+
+            const camera = new THREE.PerspectiveCamera(
+                75,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000
+            );
+            camera.position.set(0, 10, 15);
+            camera.lookAt(0, 0, 0);
+
+            const renderer = new THREE.WebGLRenderer({
+                antialias: true,
+                canvas: document.getElementById('gameCanvas'),
+                powerPreference: 'high-performance',
+                failIfMajorPerformanceCaveat: true,
+                preserveDrawingBuffer: false,
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(5, 10, 7);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 1024;
+            directionalLight.shadow.mapSize.height = 1024;
+            scene.add(directionalLight);
+
+            const arenaSize = 20;
+            const arenaGeometry = new THREE.BoxGeometry(arenaSize, 0.5, arenaSize);
+            const arenaMaterial = new THREE.MeshStandardMaterial({
+                color: 0x222222,
+                roughness: 0.8,
+                metalness: 0.2,
+            });
+            const arena = new THREE.Mesh(arenaGeometry, arenaMaterial);
+            arena.receiveShadow = true;
+            arena.position.y = -0.5;
+            scene.add(arena);
+
+            const createFighter = (color, xPos) => {
+                const geometry = new THREE.BoxGeometry(1, 2, 1);
+                const material = new THREE.MeshStandardMaterial({
+                    color,
+                    roughness: 0.4,
+                    metalness: 0.6,
+                });
+                const fighter = new THREE.Mesh(geometry, material);
+                fighter.castShadow = true;
+                fighter.position.set(xPos, 1, 0);
+                return fighter;
+            };
+
+            const player1 = createFighter(0xff3333, -5);
+            const player2 = createFighter(0x3399ff, 5);
+            scene.add(player1, player2);
+
+            const gameState = {
+                player1: {
+                    health: 100,
+                    controls: {
+                        left: 'a',
+                        right: 'd',
+                        up: 'w',
+                        down: 's',
+                        punch: 'q',
+                        kick: 'e',
+                    },
+                    attacking: false,
+                    attackCooldown: 0,
+                },
+                player2: {
+                    health: 100,
+                    controls: {
+                        left: 'ArrowLeft',
+                        right: 'ArrowRight',
+                        up: 'ArrowUp',
+                        down: 'ArrowDown',
+                        punch: '/',
+                        kick: '.',
+                    },
+                    attacking: false,
+                    attackCooldown: 0,
+                },
+                roundTime: 60,
+                keys: {},
+                lastFrameTime: performance.now(),
+                hitboxes: {
+                    player1: new THREE.Box3(),
+                    player2: new THREE.Box3(),
+                },
+            };
+
+            document.addEventListener('keydown', (e) => (gameState.keys[e.key] = true));
+            document.addEventListener('keyup', (e) => (gameState.keys[e.key] = false));
+
+            const performAttack = (attacker, defender, damage) => {
+                gameState.hitboxes.player1.setFromObject(player1);
+                gameState.hitboxes.player2.setFromObject(player2);
+
+                const attackerBox = attacker === player1 ? gameState.hitboxes.player1 : gameState.hitboxes.player2;
+                const defenderBox = defender === player1 ? gameState.hitboxes.player1 : gameState.hitboxes.player2;
+
+                if (attackerBox.intersectsBox(defenderBox)) {
+                    if (defender === player1) {
+                        gameState.player1.health = Math.max(0, gameState.player1.health - damage);
+                    } else {
+                        gameState.player2.health = Math.max(0, gameState.player2.health - damage);
+                    }
+
+                    defender.material.color.setHex(0xffffff);
+                    setTimeout(() => {
+                        defender.material.color.setHex(defender === player1 ? 0xff3333 : 0x3399ff);
+                    }, 200);
+                }
+            };
+
+            const animate = (currentTime) => {
+                requestAnimationFrame(animate);
+
+                const deltaTime = (currentTime - gameState.lastFrameTime) / 1000;
+                gameState.lastFrameTime = currentTime;
+
+                const moveSpeed = 5;
+                const moveDelta = moveSpeed * deltaTime;
+
+                if (gameState.keys[gameState.player1.controls.left]) player1.position.x -= moveDelta;
+                if (gameState.keys[gameState.player1.controls.right]) player1.position.x += moveDelta;
+                if (gameState.keys[gameState.player1.controls.up]) player1.position.z -= moveDelta;
+                if (gameState.keys[gameState.player1.controls.down]) player1.position.z += moveDelta;
+
+                if (gameState.keys[gameState.player2.controls.left]) player2.position.x -= moveDelta;
+                if (gameState.keys[gameState.player2.controls.right]) player2.position.x += moveDelta;
+                if (gameState.keys[gameState.player2.controls.up]) player2.position.z -= moveDelta;
+                if (gameState.keys[gameState.player2.controls.down]) player2.position.z += moveDelta;
+
+                gameState.player1.attackCooldown = Math.max(0, gameState.player1.attackCooldown - deltaTime);
+                gameState.player2.attackCooldown = Math.max(0, gameState.player2.attackCooldown - deltaTime);
+
+                if (gameState.keys[gameState.player1.controls.punch] && gameState.player1.attackCooldown <= 0) {
+                    performAttack(player1, player2, 10);
+                    gameState.player1.attackCooldown = 0.5;
+                }
+
+                if (gameState.keys[gameState.player2.controls.punch] && gameState.player2.attackCooldown <= 0) {
+                    performAttack(player2, player1, 10);
+                    gameState.player2.attackCooldown = 0.5;
+                }
+
+                const boundary = arenaSize / 2 - 1;
+                player1.position.x = Math.max(-boundary, Math.min(boundary, player1.position.x));
+                player1.position.z = Math.max(-boundary, Math.min(boundary, player1.position.z));
+                player2.position.x = Math.max(-boundary, Math.min(boundary, player2.position.x));
+                player2.position.z = Math.max(-boundary, Math.min(boundary, player2.position.z));
+
+                gameState.roundTime -= deltaTime;
+                document.getElementById('roundTimer').textContent = Math.max(0, Math.floor(gameState.roundTime));
+
+                document.getElementById('player1Health').style.width = \`\${gameState.player1.health}%\`;
+                document.getElementById('player2Health').style.width = \`\${gameState.player2.health}%\`;
+
+                renderer.render(scene, camera);
+            };
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            document.getElementById('gameCanvas').focus();
+
+            animate(performance.now());
+        } catch (error) {
+            console.error('Game initialization failed:', error);
+            document.body.innerHTML = `
+                <div class="flex items-center justify-center h-screen bg-gray-900 text-white p-4">
+                    <div class="text-center max-w-md bg-gray-800 rounded-lg p-6">
+                        <h1 class="text-2xl font-bold mb-4">Game Error</h1>
+                        <p class="mb-4">${error.message}</p>
+                        <p class="text-sm">Please try using Chrome or Firefox with WebGL enabled.</p>
+                        <a href="index.html" class="mt-4 inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                            Return to Menu
+                        </a>
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
