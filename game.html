@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Fighting Arena | Battle</title>
+    <link href="/dist/output.css" rel="stylesheet">
+    <script src="https://threejs.org/build/three.min.js"></script>
+    <script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://threejs.org/examples/js/loaders/GLTFLoader.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Orbitron', sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #uiContainer {
+            pointer-events: none;
+        }
+        .health-bar {
+            height: 30px;
+            transition: width 0.3s ease;
+        }
+        #player1Health { background: linear-gradient(to right, #ef4444, #b91c1c); }
+        #player2Health { background: linear-gradient(to right, #3b82f6, #1d4ed8); }
+        .screen-shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="uiContainer" class="fixed inset-0 pointer-events-none">
+        <!-- Player 1 Health -->
+        <div class="absolute top-4 left-4 w-64 bg-gray-800 rounded-md overflow-hidden">
+            <div id="player1Health" class="health-bar" style="width: 100%"></div>
+        </div>
+        
+        <!-- Player 2 Health -->
+        <div class="absolute top-4 right-4 w-64 bg-gray-800 rounded-md overflow-hidden">
+            <div id="player2Health" class="health-bar" style="width: 100%"></div>
+        </div>
+        
+        <!-- Round Timer -->
+        <div class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-gray-800 px-4 py-2 rounded-md text-white text-xl">
+            <span id="roundTimer">60</span>s
+        </div>
+        
+        <!-- Controls Info -->
+        <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-4 py-2 rounded-md text-sm">
+            <span id="controlsInfo">WASD: Move | Q/E: Attack | SPACE: Block</span>
+        </div>
+    </div>
+
+    <script>
+        // Load settings
+        const defaultSettings = {
+            resolutionScale: 100,
+            masterVolume: 80,
+            musicVolume: 70,
+            controls: {
+                player1: { up: 'w', down: 's', left: 'a', right: 'd', punch: 'q', block: ' ' },
+                player2: { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', punch: 'e', block: 'Enter' }
+            }
+        };
+        const savedSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+        const settings = { ...defaultSettings, ...savedSettings };
+
+        // Update controls info display
+        document.getElementById('controlsInfo').textContent = 
+            `${settings.controls.player1.up.toUpperCase()}/${settings.controls.player1.down.toUpperCase()}/${settings.controls.player1.left.toUpperCase()}/${settings.controls.player1.right.toUpperCase()}: Move | ` +
+            `${settings.controls.player1.punch.toUpperCase()}/${settings.controls.player2.punch.toUpperCase()}: Attack | ` +
+            `${settings.controls.player1.block.toUpperCase()}: Block`;
+
+        // Initialize Three.js scene
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ 
+            antialias: true, 
+            canvas: document.getElementById('gameCanvas') 
+        });
+        renderer.setPixelRatio(window.devicePixelRatio * (settings.resolutionScale / 100));
+        renderer.shadowMap.enabled = true;
+
+        // Add lights
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(1, 1, 1);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
+
+        // Create arena
+        const arenaSize = 20;
+        const arenaGeometry = new THREE.BoxGeometry(arenaSize, 0.5, arenaSize);
+        const arenaMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x333333,
+            roughness: 0.8,
+            metalness: 0.2
+        });
+        const arena = new THREE.Mesh(arenaGeometry, arenaMaterial);
+        arena.receiveShadow = true;
+        arena.position.y = -0.5;
+        scene.add(arena);
+
+        // Add arena boundary
+        const boundaryGeometry = new THREE.BoxGeometry(arenaSize + 2, 2, arenaSize + 2);
+        const boundaryEdges = new THREE.EdgesGeometry(boundaryGeometry);
+        const boundary = new THREE.LineSegments(
+            boundaryEdges,
+            new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 })
+        );
+        boundary.position.y = 1;
+        scene.add(boundary);
+
+        // Create fighters (placeholder cubes)
+        const createFighter = (color, xPos) => {
+            const geometry = new THREE.BoxGeometry(1, 2, 1);
+            const material = new THREE.MeshStandardMaterial({ color });
+            const fighter = new THREE.Mesh(geometry, material);
+            fighter.castShadow = true;
+            fighter.position.x = xPos;
+            fighter.position.y = 1;
+            return fighter;
+        };
+
+        const player1 = createFighter(0xef4444, -5);
+        const player2 = createFighter(0x3b82f6, 5);
+        scene.add(player1, player2);
+
+        // Position camera
+        camera.position.set(0, 10, 15);
+        camera.lookAt(0, 0, 0);
+
+        // Game state
+        const gameState = {
+            player1: { 
+                health: 100, 
+                attacking: false, 
+                blocking: false,
+                controls: settings.controls.player1
+            },
+            player2: { 
+                health: 100, 
+                attacking: false, 
+                blocking: false,
+                controls: settings.controls.player2 
+            },
+            roundTime: 60,
+            gameActive: true,
+            settings: settings
+        };
+
+        // Input handling
+        const keys = {};
+        document.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+        document.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+
+        // Game loop
+        const clock = new THREE.Clock();
+        const animate = () => {
+            requestAnimationFrame(animate);
+            
+            const delta = clock.getDelta();
+            
+            if (gameState.gameActive) {
+                // Update round timer
+                gameState.roundTime -= delta;
+                document.getElementById('roundTimer').textContent = Math.max(0, Math.floor(gameState.roundTime));
+                
+                // Handle player 1 movement
+                if (keys[gameState.player1.controls.left]) player1.position.x -= 5 * delta;
+                if (keys[gameState.player1.controls.right]) player1.position.x += 5 * delta;
+                if (keys[gameState.player1.controls.up]) player1.position.z -= 5 * delta;
+                if (keys[gameState.player1.controls.down]) player1.position.z += 5 * delta;
+                
+                // Handle player 1 attacks
+                if (keys[gameState.player1.controls.punch] && !gameState.player1.attacking) {
+                    gameState.player1.attacking = true;
+                    setTimeout(() => gameState.player1.attacking = false, 500);
+                    // Check hit detection
+                    if (player1.position.distanceTo(player2.position) < 2 && !gameState.player2.blocking) {
+                        gameState.player2.health -= 10;
+                        document.getElementById('player2Health').style.width = `${gameState.player2.health}%`;
+                        document.body.classList.add('screen-shake');
+                        setTimeout(() => document.body.classList.remove('screen-shake'), 500);
+                    }
+                }
+                
+                // Handle player 1 block
+                gameState.player1.blocking = keys[gameState.player1.controls.block];
+                
+                // Boundary checks
+                player1.position.x = Math.max(-arenaSize/2, Math.min(arenaSize/2, player1.position.x));
+                player1.position.z = Math.max(-arenaSize/2, Math.min(arenaSize/2, player1.position.z));
+                player2.position.x = Math.max(-arenaSize/2, Math.min(arenaSize/2, player2.position.x));
+                player2.position.z = Math.max(-arenaSize/2, Math.min(arenaSize/2, player2.position.z));
+                
+                // Check win conditions
+                if (gameState.player1.health <= 0 || gameState.player2.health <= 0 || gameState.roundTime <= 0) {
+                    gameState.gameActive = false;
+                    alert(gameState.player1.health > gameState.player2.health ? 'Player 1 Wins!' : 'Player 2 Wins!');
+                }
+            }
+            
+            renderer.render(scene, camera);
+        };
+
+        // Handle window resize and apply resolution scale
+        const handleResize = () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(
+                window.innerWidth * (gameState.settings.resolutionScale / 100),
+                window.innerHeight * (gameState.settings.resolutionScale / 100)
+            );
+        };
+        window.addEventListener('resize', handleResize);
+        handleResize(); // Initial sizing
+
+        // Start game
+        animate();
+
+        // WebGL fallback
+        if (!renderer.getContext()) {
+            document.body.innerHTML = `
+                <div class="flex items-center justify-center h-screen bg-gray-900 text-white">
+                    <div class="text-center p-8 bg-gray-800 rounded-lg">
+                        <h1 class="text-2xl mb-4">WebGL Not Supported</h1>
+                        <p class="mb-4">Your browser doesn't support WebGL which is required for this game.</p>
+                        <p>Please try Chrome, Firefox, or Edge.</p>
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
