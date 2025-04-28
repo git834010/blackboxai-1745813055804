@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Endless Runner Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <style>
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background: linear-gradient(to top, #1f2937, #4b5563);
+            overflow: hidden;
+            user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+        #gameCanvas {
+            background: linear-gradient(to top, #6ee7b7 0%, #3b82f6 100%);
+            display: block;
+            margin: 0 auto;
+            border: 6px solid #10b981;
+            border-radius: 16px;
+            box-shadow: 0 0 30px #10b981;
+            image-rendering: pixelated;
+        }
+        #score {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #10b981;
+            font-size: 2rem;
+            text-shadow: 0 0 15px #10b981;
+            user-select: none;
+            z-index: 20;
+        }
+        #genderToggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #10b981;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 12px;
+            font-size: 1rem;
+            cursor: pointer;
+            box-shadow: 0 0 10px #10b981;
+            user-select: none;
+            z-index: 20;
+            transition: background-color 0.3s ease;
+        }
+        #genderToggle:hover {
+            background-color: #059669;
+        }
+        #startScreen {
+            position: fixed;
+            inset: 0;
+            background: rgba(4, 120, 87, 0.85);
+            color: #a7f3d0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            user-select: none;
+            z-index: 30;
+        }
+        #startScreen:hover {
+            color: #6ee7b7;
+        }
+    </style>
+</head>
+<body>
+    <div id="score">Score: 0</div>
+    <button id="genderToggle" title="Toggle Gender"><i class="fas fa-venus-mars"></i> Gender: Male</button>
+    <div id="startScreen">
+        <p>Click or Press Space to Start</p>
+        <p class="mt-4 text-sm">Endless Runner Game</p>
+        <i class="fas fa-running fa-3x mt-4 animate-bounce"></i>
+    </div>
+    <canvas id="gameCanvas" width="900" height="600"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Runner sprites (placeholder URLs, can be replaced with better sprites)
+        const runnerMale = new Image();
+        runnerMale.src = 'https://i.ibb.co/7QpKsCX/male-runner.png'; // Placeholder male runner sprite
+        const runnerFemale = new Image();
+        runnerFemale.src = 'https://i.ibb.co/2kR7Z9M/female-runner.png'; // Placeholder female runner sprite
+
+        let currentRunner = runnerMale;
+        let gender = 'male';
+
+        const gravity = 1.2;
+        const jumpPower = -18;
+        const hurdleWidth = 40;
+        const hurdleHeight = 80;
+        const hurdleGapMin = 200;
+        const hurdleGapMax = 350;
+        const hurdleSpeed = 8;
+
+        let runner = {
+            x: 100,
+            y: canvas.height - 150,
+            width: 60,
+            height: 90,
+            velocityY: 0,
+            onGround: true
+        };
+
+        let hurdles = [];
+        let frameCount = 0;
+        let score = 0;
+        let gameRunning = false;
+
+        function resetGame() {
+            runner.y = canvas.height - 150;
+            runner.velocityY = 0;
+            runner.onGround = true;
+            hurdles = [];
+            frameCount = 0;
+            score = 0;
+            gameRunning = true;
+            document.getElementById('score').textContent = 'Score: 0';
+            document.getElementById('startScreen').style.display = 'none';
+        }
+
+        function createHurdle() {
+            let lastHurdleX = hurdles.length > 0 ? hurdles[hurdles.length - 1].x : canvas.width;
+            let gap = Math.random() * (hurdleGapMax - hurdleGapMin) + hurdleGapMin;
+            hurdles.push({
+                x: lastHurdleX + gap,
+                y: canvas.height - hurdleHeight - 60,
+                width: hurdleWidth,
+                height: hurdleHeight,
+                passed: false
+            });
+        }
+
+        function drawHurdle(hurdle) {
+            const gradient = ctx.createLinearGradient(hurdle.x, hurdle.y, hurdle.x + hurdle.width, hurdle.y + hurdle.height);
+            gradient.addColorStop(0, '#059669');
+            gradient.addColorStop(1, '#065f46');
+            ctx.fillStyle = gradient;
+            ctx.shadowColor = '#065f46';
+            ctx.shadowBlur = 10;
+            ctx.fillRect(hurdle.x, hurdle.y, hurdle.width, hurdle.height);
+            ctx.shadowBlur = 0;
+        }
+
+        function drawRunner() {
+            ctx.drawImage(currentRunner, runner.x, runner.y, runner.width, runner.height);
+        }
+
+        function update() {
+            if (!gameRunning) return;
+
+            frameCount++;
+
+            // Runner physics
+            runner.velocityY += gravity;
+            runner.y += runner.velocityY;
+
+            if (runner.y > canvas.height - runner.height - 60) {
+                runner.y = canvas.height - runner.height - 60;
+                runner.velocityY = 0;
+                runner.onGround = true;
+            } else {
+                runner.onGround = false;
+            }
+
+            // Create hurdles every 90 frames or if none exist
+            if (frameCount % 90 === 0 || hurdles.length === 0) {
+                createHurdle();
+            }
+
+            // Move hurdles and check for collisions
+            for (let i = hurdles.length - 1; i >= 0; i--) {
+                hurdles[i].x -= hurdleSpeed;
+
+                // Check if runner passed hurdle for scoring
+                if (!hurdles[i].passed && hurdles[i].x + hurdles[i].width < runner.x) {
+                    hurdles[i].passed = true;
+                    score++;
+                    document.getElementById('score').textContent = 'Score: ' + score;
+                }
+
+                // Collision detection
+                if (
+                    runner.x < hurdles[i].x + hurdles[i].width &&
+                    runner.x + runner.width > hurdles[i].x &&
+                    runner.y + runner.height > hurdles[i].y
+                ) {
+                    gameOver();
+                }
+
+                // Remove offscreen hurdles
+                if (hurdles[i].x + hurdles[i].width < 0) {
+                    hurdles.splice(i, 1);
+                }
+            }
+
+            // Prevent runner from falling below ground
+            if (runner.y > canvas.height - runner.height - 60) {
+                runner.y = canvas.height - runner.height - 60;
+                runner.velocityY = 0;
+                runner.onGround = true;
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            document.getElementById('startScreen').style.display = 'flex';
+        }
+
+        function jump() {
+            if (!gameRunning) {
+                resetGame();
+            }
+            if (runner.onGround) {
+                runner.velocityY = jumpPower;
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw background gradient
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#6ee7b7');
+            gradient.addColorStop(1, '#3b82f6');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw ground
+            ctx.fillStyle = '#065f46';
+            ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
+
+            // Draw hurdles
+            hurdles.forEach(drawHurdle);
+
+            // Draw runner
+            drawRunner();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Event listeners
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                jump();
+            }
+        });
+
+        window.addEventListener('mousedown', (e) => {
+            jump();
+        });
+
+        // Gender toggle button
+        const genderToggle = document.getElementById('genderToggle');
+        genderToggle.addEventListener('click', () => {
+            if (gender === 'male') {
+                gender = 'female';
+                currentRunner = runnerFemale;
+                genderToggle.innerHTML = '<i class="fas fa-venus"></i> Gender: Female';
+            } else {
+                gender = 'male';
+                currentRunner = runnerMale;
+                genderToggle.innerHTML = '<i class="fas fa-mars"></i> Gender: Male';
+            }
+        });
+
+        // Start the game loop
+        gameLoop();
+    </script>
+</body>
+</html>
